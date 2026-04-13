@@ -154,4 +154,10 @@ public class Networks {
             throws CertificateException, NoSuchAlgorithmException, KeyStoreException, IOException, CertStoreException {
         return new LocalX509TrustManager(getKnownServersStore(context));
     }
+
+    public static boolean isLocalAddress(String url) {
+        return url.contains("localhost")
+                || url.contains("127.0.0.1")
+                || url.matches("10\\.(\\d){1,3}\\.(\\d){1,3}\\.(\\d){1,3}");
+    }
 }

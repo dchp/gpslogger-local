@@ -326,28 +326,32 @@ public class Systems {
      * @return
      */
     public static void startWorkManagerRequest(Class workerClass, HashMap<String, Object> dataMap, String tag) {
+        startWorkManagerRequest(workerClass, dataMap, tag, true);
+    }
 
+    public static void startWorkManagerRequest(Class workerClass, HashMap<String, Object> dataMap, String tag, boolean requiresNetwork) {
         androidx.work.Data data = new Data.Builder().putAll(dataMap).build();
 
-        NetworkRequest.Builder builder = new NetworkRequest.Builder();
-        builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
-            builder.addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+        Constraints.Builder constraintsBuilder = new Constraints.Builder();
+
+        if (requiresNetwork) {
+            NetworkRequest.Builder builder = new NetworkRequest.Builder();
+            builder.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                builder.addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
+            }
+            if (PreferenceHelper.getInstance().shouldAutoSendOnWifiOnly()) {
+                builder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
+            }
+            NetworkRequest networkRequest = builder.build();
+
+            constraintsBuilder
+                    .setRequiredNetworkRequest(networkRequest, PreferenceHelper.getInstance().shouldAutoSendOnWifiOnly() ? NetworkType.UNMETERED : NetworkType.CONNECTED)
+                    .setRequiredNetworkType(PreferenceHelper.getInstance().shouldAutoSendOnWifiOnly() ? NetworkType.UNMETERED : NetworkType.CONNECTED);
         }
-        if(PreferenceHelper.getInstance().shouldAutoSendOnWifiOnly()){
-            builder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
-        }
-        NetworkRequest networkRequest = builder.build();
 
-
-        Constraints constraints = new Constraints.Builder()
-                .setRequiredNetworkRequest(networkRequest, PreferenceHelper.getInstance().shouldAutoSendOnWifiOnly() ? NetworkType.UNMETERED: NetworkType.CONNECTED)
-                .setRequiredNetworkType(PreferenceHelper.getInstance().shouldAutoSendOnWifiOnly() ? NetworkType.UNMETERED: NetworkType.CONNECTED)
-                .build();
-
-        OneTimeWorkRequest workRequest = new OneTimeWorkRequest
-                .Builder(workerClass)
-                .setConstraints(constraints)
+        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(workerClass)
+                .setConstraints(constraintsBuilder.build())
                 .setInitialDelay(1, java.util.concurrent.TimeUnit.SECONDS)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, java.util.concurrent.TimeUnit.SECONDS)
                 .setInputData(data)
