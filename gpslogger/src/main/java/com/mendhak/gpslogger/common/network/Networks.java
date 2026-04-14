@@ -156,8 +156,10 @@ public class Networks {
     }
 
     public static boolean isLocalAddress(String url) {
-        return url.contains("localhost")
-                || url.contains("127.0.0.1")
-                || url.matches("10\\.(\\d){1,3}\\.(\\d){1,3}\\.(\\d){1,3}");
+        if (url == null) {
+            return false;
+        }
+
+        return url.matches("^https?://(localhost|127\\.0\\.0\\.1|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|172\\.16\\.5\\.2)/.*");
     }
 }
