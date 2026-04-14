@@ -160,6 +160,6 @@ public class Networks {
             return false;
         }
 
-        return url.matches("^https?://(localhost|127\\.0\\.0\\.1|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|172\\.16\\.5\\.2)/.*");
+        return url.matches("^https?://(localhost|127\\.0\\.0\\.1|10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|172\\.16\\.5\\.2)(:\\d+)?/.*");
     }
 }
