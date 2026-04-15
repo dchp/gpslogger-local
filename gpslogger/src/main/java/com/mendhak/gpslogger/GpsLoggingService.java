@@ -953,11 +953,12 @@ public class GpsLoggingService extends Service  {
 
         boolean isPassiveLocation = loc.getExtras().getBoolean(BundleConstants.PASSIVE);
         long currentTimeStamp = System.currentTimeMillis();
+        Location previousLocationInfo = session.getPreviousLocationInfo();
 
         LOG.debug("Has description? " + session.hasDescription() + ", Single point? " + session.isSinglePointMode() + ", Last timestamp: " + session.getLatestTimeStamp() + ", Current timestamp: " + currentTimeStamp);
 
         // Sometimes we are given a cached location whose time is in the past and already logged.
-        if (session.getPreviousLocationInfo() != null && loc.getTime() <= session.getPreviousLocationInfo().getTime()){
+        if (previousLocationInfo != null && loc.getTime() <= previousLocationInfo.getTime()){
             LOG.debug("Received a stale location, its time was less than or equal to a previous point. Ignoring.");
             return;
         }
@@ -965,22 +966,24 @@ public class GpsLoggingService extends Service  {
         // Don't log a point until the user-defined time has elapsed
         // However, if user has set an annotation, just log the point, disregard time and distance filters
         // However, if it's a passive location, disregard the time filter
+        long timeSinceLastLog = getTimeSinceLastLog(loc, currentTimeStamp, previousLocationInfo);
+
         if (!isPassiveLocation && !session.hasDescription()
                 && !session.isSinglePointMode()
-                && (currentTimeStamp - session.getLatestTimeStamp()) < (preferenceHelper.getMinimumLoggingInterval() * 1000)) {
+                && timeSinceLastLog < (preferenceHelper.getMinimumLoggingInterval() * 1000)) {
             LOG.debug("Received location, but minimum logging interval has not passed. Ignoring.");
             return;
         }
 
         // Even if it's a passive location, the time should be greater than the previous location's time.
-        if(isPassiveLocation && session.getPreviousLocationInfo() != null && loc.getTime() <= session.getPreviousLocationInfo().getTime()){
-            LOG.debug("Passive location time: " + loc.getTime() + ", previous location's time: " + session.getPreviousLocationInfo().getTime());
+        if(isPassiveLocation && previousLocationInfo != null && loc.getTime() <= previousLocationInfo.getTime()){
+            LOG.debug("Passive location time: " + loc.getTime() + ", previous location's time: " + previousLocationInfo.getTime());
             LOG.debug("Passive location received, but its time was less than the previous point's time.");
             return;
         }
 
         // Even if it's a passive location, the loc.getTime() - session.getLatestPassiveTimeStamp()  should be greater than the previous getPassiveFilterInterval's time.
-        if(isPassiveLocation && session.getPreviousLocationInfo() != null ){
+        if(isPassiveLocation && previousLocationInfo != null ){
             if  ((loc.getTime() - session.getLatestPassiveTimeStamp()) < (preferenceHelper.getPassiveFilterInterval() * 1000)) {
                 LOG.debug("Passive location discarded; interval set=>{}ms old=>{}ms now=>{}ms Filter",
                         (preferenceHelper.getPassiveFilterInterval() * 1000),
@@ -1124,6 +1127,22 @@ public class GpsLoggingService extends Service  {
             LOG.debug("Single point mode - stopping now");
             stopLogging();
         }
+    }
+
+    private long getTimeSinceLastLog(Location loc, long currentTimeStamp, Location previousLocationInfo) {
+        // Workaround for faulty GPS chips (like Note 8) that report time in the past
+        // If the location time is significantly behind system time (e.g. 10 years),
+        // we treat it as "GPS time only" and use it for interval calculation.
+        boolean isTimeInPast = Math.abs(currentTimeStamp - loc.getTime()) > 1000L * 60 * 60 * 24 * 365 * 10;
+
+        if (isTimeInPast) {
+            LOG.debug("Faulty GPS time detected ({}). Current system time: {}", loc.getTime(), currentTimeStamp);
+            if (previousLocationInfo != null) {
+                return loc.getTime() - previousLocationInfo.getTime();
+            }
+        }
+
+        return (currentTimeStamp - session.getLatestTimeStamp());
     }
 
     private String getLocationDisplayForLogs(Location loc) {
