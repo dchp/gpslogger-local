@@ -172,21 +172,24 @@ public class GpsMainActivity extends AppCompatActivity
         }
         else {
             LOG.debug("Permission check - OK");
+            completeSetup();
+        }
+    }
 
-            startAndBindService();
-            registerEventBus();
-            registerConscryptProvider();
+    private void completeSetup() {
+        startAndBindService();
+        registerEventBus();
+        registerConscryptProvider();
 
-            if(preferenceHelper.shouldStartLoggingOnAppLaunch()){
-                LOG.debug("Start logging on app launch");
-                EventBus.getDefault().postSticky(new CommandEvents.RequestStartStop(true));
-            }
+        if (preferenceHelper.shouldStartLoggingOnAppLaunch()) {
+            LOG.debug("Start logging on app launch");
+            EventBus.getDefault().postSticky(new CommandEvents.RequestStartStop(true));
+        }
 
-            if(preferenceHelper.shouldStopLoggingOnAppLaunch()){
-                LOG.debug("Stop logging on app launch");
-                EventBus.getDefault().postSticky(new CommandEvents.RequestStartStop(false));
-                logSinglePoint();
-            }
+        if (preferenceHelper.shouldStopLoggingOnAppLaunch()) {
+            LOG.debug("Stop logging on app launch");
+            EventBus.getDefault().postSticky(new CommandEvents.RequestStartStop(false));
+            logSinglePoint();
         }
     }
 
@@ -201,6 +204,7 @@ public class GpsMainActivity extends AppCompatActivity
                             LOG.warn("Background location permission was not granted");
                             Dialogs.alert(getString(R.string.gpslogger_permissions_rationale_title), getString(R.string.gpslogger_permissions_permanently_denied), this);
                             permissionWorkflowInProgress=false;
+                            completeSetup();
                         }
                     });
 
@@ -212,6 +216,7 @@ public class GpsMainActivity extends AppCompatActivity
                             LOG.warn("At least one of the permissions was not granted");
                             Dialogs.alert(getString(R.string.gpslogger_permissions_rationale_title), getString(R.string.gpslogger_permissions_permanently_denied), this);
                             permissionWorkflowInProgress=false;
+                            completeSetup();
                         } else {
                             LOG.debug("Basic permissions granted. Now ask for background location permissions.");
                             askUserForBackgroundPermissions();
@@ -236,6 +241,7 @@ public class GpsMainActivity extends AppCompatActivity
                         }
                     }
                     permissionWorkflowInProgress=false;
+                    completeSetup();
                 }
             });
 
@@ -494,10 +500,13 @@ public class GpsMainActivity extends AppCompatActivity
                     // https://issuetracker.google.com/issues/37067894?pli=1
                     LOG.debug("App is already ignoring battery optimization. On some earlier versions of Android this is incorrectly reported, it can only be corrected manually.");
                     permissionWorkflowInProgress=false;
+                    completeSetup();
                 }
             }
             catch(Exception e){
                 LOG.error("Unable to request ignoring battery optimizations.", e);
+                permissionWorkflowInProgress=false;
+                completeSetup();
             }
         }
     }
