@@ -951,6 +951,10 @@ public class GpsLoggingService extends Service  {
             return;
         }
 
+        // Fix faulty GPS timestamps (e.g. Note 8) immediately on entry.
+        // This ensures all subsequent checks (stale points, intervals) work with correct dates.
+        loc = Locations.getLocationAdjustedForGPSWeekRollover(loc);
+
         boolean isPassiveLocation = loc.getExtras().getBoolean(BundleConstants.PASSIVE);
         long currentTimeStamp = System.currentTimeMillis();
         Location previousLocationInfo = session.getPreviousLocationInfo();
@@ -966,11 +970,9 @@ public class GpsLoggingService extends Service  {
         // Don't log a point until the user-defined time has elapsed
         // However, if user has set an annotation, just log the point, disregard time and distance filters
         // However, if it's a passive location, disregard the time filter
-        long timeSinceLastLog = getTimeSinceLastLog(loc, currentTimeStamp, previousLocationInfo);
-
         if (!isPassiveLocation && !session.hasDescription()
                 && !session.isSinglePointMode()
-                && timeSinceLastLog < (preferenceHelper.getMinimumLoggingInterval() * 1000)) {
+                && (currentTimeStamp - session.getLatestTimeStamp()) < (preferenceHelper.getMinimumLoggingInterval() * 1000)) {
             LOG.debug("Received location, but minimum logging interval has not passed. Ignoring.");
             return;
         }
@@ -1104,7 +1106,6 @@ public class GpsLoggingService extends Service  {
         LOG.debug(String.valueOf(loc.getLatitude()) + "," + String.valueOf(loc.getLongitude()));
         LOG.info(SessionLogcatAppender.MARKER_LOCATION, getLocationDisplayForLogs(loc));
         loc = Locations.getLocationWithAdjustedAltitude(loc, preferenceHelper);
-        loc = Locations.getLocationAdjustedForGPSWeekRollover(loc);
         resetCurrentFileName(false);
         session.setLatestTimeStamp(System.currentTimeMillis());
         session.setFirstRetryTimeStamp(0);
@@ -1127,22 +1128,6 @@ public class GpsLoggingService extends Service  {
             LOG.debug("Single point mode - stopping now");
             stopLogging();
         }
-    }
-
-    private long getTimeSinceLastLog(Location loc, long currentTimeStamp, Location previousLocationInfo) {
-        // Workaround for faulty GPS chips (like Note 8) that report time in the past
-        // If the location time is significantly behind system time (e.g. 10 years),
-        // we treat it as "GPS time only" and use it for interval calculation.
-        boolean isTimeInPast = Math.abs(currentTimeStamp - loc.getTime()) > 1000L * 60 * 60 * 24 * 365 * 10;
-
-        if (isTimeInPast) {
-            LOG.debug("Faulty GPS time detected ({}). Current system time: {}", loc.getTime(), currentTimeStamp);
-            if (previousLocationInfo != null) {
-                return loc.getTime() - previousLocationInfo.getTime();
-            }
-        }
-
-        return (currentTimeStamp - session.getLatestTimeStamp());
     }
 
     private String getLocationDisplayForLogs(Location loc) {
