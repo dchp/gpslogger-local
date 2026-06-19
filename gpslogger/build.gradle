@@ -45,8 +45,8 @@ android {
 
         targetSdkVersion 35
         compileSdk 35
-        versionCode 1013501
-        versionName "135-local-b"
+        versionCode 1013502
+        versionName "135-local-c"
 
         // Used by AppAuth-Android
         manifestPlaceholders = [
